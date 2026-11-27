@@ -252,8 +252,10 @@ function badgeTime(sec) {
   return `${Math.floor(sec / 60)}m`;
 }
 
-async function onRecorderStatus(status) {
+async function onRecorderStatus(status, hostId) {
   const prev = (await getSession('recState')) || {};
+  // Ignore late updates from a recording that already finished, or from a stale host.
+  if (!prev.active || (hostId && prev.hostId && hostId !== prev.hostId)) return;
   const next = { ...prev, ...status, active: !['done', 'error', 'cancelled', 'idle'].includes(status.state) };
   await setSession({ recState: next });
   if (status.state === 'countdown') await setBadge(String(status.countdown), '#f59e0b');
@@ -313,7 +315,7 @@ const handlers = {
   'rec:get-state': async () => ({ state: (await getSession('recState')) || null }),
 
   // from the offscreen recorder
-  'rec:status': async (m) => { await onRecorderStatus(m.status); return { ok: true }; }, // m.hostId identifies the sender
+  'rec:status': async (m) => { await onRecorderStatus(m.status, m.hostId); return { ok: true }; },
   'rec:finished': async (m) => { await onRecorderFinished(m); return { ok: true }; },
   'rec:notify': async (m) => { await overlayMessage({ type: 'overlay:toast', text: m.text }); broadcast({ type: 'rec:toast', text: m.text }); return { ok: true }; },
 
