@@ -344,6 +344,10 @@ function siteName(url, title) {
     const u = new URL(url);
     if (u.protocol === "file:") return decodeURIComponent(u.pathname.split("/").pop() || "File").replace(/\.[a-z0-9]+$/i, "");
     let h2 = u.hostname.replace(/^www\d?\./, "");
+    if (/^(\d+\.){3}\d+$|^\[|:|^localhost$/i.test(h2)) {
+      const t = (title || "").split(/[\s|–—-]+/).filter(Boolean).slice(0, 3).join("_");
+      return t || "Localhost";
+    }
     const parts = h2.split(".");
     let main = parts.length >= 3 && parts[parts.length - 2].length <= 3 ? parts[parts.length - 3] : parts.length >= 2 ? parts[parts.length - 2] : parts[0];
     if (!main) main = title || "Page";
@@ -399,30 +403,39 @@ function downloadBlob(blob, baseName, ext, settings2, { saveAs } = {}) {
   const url = URL.createObjectURL(blob);
   const filename = buildDownloadPath(baseName, ext, settings2);
   return new Promise((resolve, reject) => {
-    chrome.downloads.download({ url, filename, conflictAction: "uniquify", saveAs: saveAs ?? !!settings2?.askWhereToSave }, (id) => {
-      if (chrome.runtime.lastError || id == null) {
+    let id = null;
+    let settled = false;
+    const finish = (state, error) => {
+      if (settled) return;
+      settled = true;
+      chrome.downloads.onChanged.removeListener(onChanged);
+      setTimeout(() => URL.revokeObjectURL(url), 1e4);
+      if (state === "complete") resolve({ id, filename });
+      else reject(new Error(error === "USER_CANCELED" ? "Download cancelled." : `Download interrupted (${error || "unknown reason"}). Try again or choose another folder.`));
+    };
+    const check = (d) => {
+      if (!d) return;
+      const state = typeof d.state === "string" ? d.state : d.state?.current;
+      if (state === "complete") finish("complete");
+      else if (state === "interrupted") {
+        if (d.error && typeof d.error === "string") finish("interrupted", d.error);
+        else chrome.downloads.search({ id }, ([item2]) => finish("interrupted", item2?.error));
+      }
+    };
+    const onChanged = (d) => {
+      if (id != null && d.id === id) check(d);
+    };
+    chrome.downloads.onChanged.addListener(onChanged);
+    chrome.downloads.download({ url, filename, conflictAction: "uniquify", saveAs: saveAs ?? !!settings2?.askWhereToSave }, (newId2) => {
+      if (chrome.runtime.lastError || newId2 == null) {
+        settled = true;
+        chrome.downloads.onChanged.removeListener(onChanged);
         URL.revokeObjectURL(url);
         reject(new Error(chrome.runtime.lastError?.message || "Download was not started"));
         return;
       }
-      const onChanged = (d) => {
-        if (d.id !== id || !d.state) return;
-        if (d.state.current === "complete") {
-          cleanup();
-          resolve({ id, filename });
-        } else if (d.state.current === "interrupted") {
-          cleanup();
-          chrome.downloads.search({ id }, ([item2]) => {
-            const reason = item2?.error || "unknown reason";
-            reject(new Error(reason === "USER_CANCELED" ? "Download cancelled." : `Download interrupted (${reason}). Try again or choose another folder.`));
-          });
-        }
-      };
-      const cleanup = () => {
-        chrome.downloads.onChanged.removeListener(onChanged);
-        setTimeout(() => URL.revokeObjectURL(url), 1e4);
-      };
-      chrome.downloads.onChanged.addListener(onChanged);
+      id = newId2;
+      chrome.downloads.search({ id }, ([item2]) => check(item2));
     });
   });
 }
@@ -28141,7 +28154,7 @@ function exportPlan(opts) {
   const size = scaledOutputSize(project, srcW, srcH, opts.resolution);
   const sfps = sourceFps();
   const fps = opts.fps === "source" ? Math.min(60, sfps) : Math.min(Number(opts.fps), Math.max(sfps, 1));
-  const vbr = Math.round(Math.min(8e7, Math.max(8e5, size.width * size.height * fps * (BPP[opts.quality] || BPP.high))));
+  const vbr = opts.quality === "custom" && Number(opts.mbps) > 0 ? Math.round(Math.min(120, Math.max(0.2, Number(opts.mbps))) * 1e6) : Math.round(Math.min(8e7, Math.max(8e5, size.width * size.height * fps * (BPP[opts.quality] || BPP.high))));
   const abr = opts.quality === "max" ? 192e3 : 128e3;
   const hasAudio = opts.audio && !!info.audioCodec && !project.muted;
   const est = (vbr + (hasAudio ? abr : 0)) * dur() / 8;
@@ -28162,21 +28175,24 @@ function renderExportPane() {
   const res = sel("exp-res", [["source", `Same as source (${n.width}\xD7${n.height})`], ...[2160, 1440, 1080, 720, 480].filter((r) => r < short).map((r) => [r, `${r}p`])], opts.resolution);
   const sfps = sourceFps();
   const fps = sel("exp-fps", [["source", `Source (${sfps} fps)`], ...[60, 30, 24].filter((f) => f < sfps).map((f) => [f, `${f} fps`])], opts.fps);
-  const quality = sel("exp-quality", [["standard", "Standard"], ["high", "High"], ["max", "Maximum"]], opts.quality);
+  const quality = sel("exp-quality", [["standard", "Standard"], ["high", "High"], ["max", "Maximum"], ["custom", "Custom bitrate"]], opts.quality);
+  const mbps = h("input", { type: "number", id: "exp-mbps", min: 0.2, max: 120, step: 0.5, value: 8 });
+  const mbpsField = fld("Video bitrate (Mbps)", mbps);
   const audio = h("input", { type: "checkbox", id: "exp-audio", checked: !!info.audioCodec && !project.muted, disabled: !info.audioCodec });
   const name = h("input", { type: "text", id: "exp-name", value: expandPattern(settings.videoPattern, { url: item.url, title: item.title, date: item.createdAt }) });
   const summary = h("div", { class: "notice small", id: "exp-summary" });
   const ident = isIdentity(project);
   const upd = () => {
-    const o = { format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, audio: audio.checked };
+    mbpsField.style.display = quality.value === "custom" ? "" : "none";
+    const o = { format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, mbps: mbps.value, audio: audio.checked };
     const pl = exportPlan(o);
     const copy = ident && o.resolution === "source" && o.fps === "source" && o.format === item.format;
     summary.textContent = copy ? `No edits: the original ${item.format.toUpperCase()} file (${formatBytes(item.size)}) is saved unchanged \u2014 no re-encoding, no quality loss.` : `${pl.width}\xD7${pl.height} \xB7 ${pl.fps} fps \xB7 ${(pl.vbr / 1e6).toFixed(1)} Mbps video${pl.hasAudio ? ` + ${pl.abr / 1e3} kbps audio` : " \xB7 no audio"} \xB7 ${formatDuration(dur())} \xB7 estimated ${formatBytes(pl.est)}`;
   };
-  for (const c of [format, res, fps, quality, audio]) c.addEventListener("change", upd);
+  for (const c of [format, res, fps, quality, audio, mbps]) c.addEventListener("change", upd);
   upd();
   const prog = h("div", { class: "col", id: "exp-progress", style: { display: "none" } }, h("div", { class: "progress" }, h("i")), h("span", { class: "small", id: "exp-status" }));
-  const go = btn("exp-go", "download", "Export video", () => runExport({ format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, audio: audio.checked, name: name.value }), "primary");
+  const go = btn("exp-go", "download", "Export video", () => runExport({ format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, mbps: mbps.value, audio: audio.checked, name: name.value }), "primary");
   const cancel = btn("exp-cancel", "x", "Cancel", () => {
     exportWorker?.postMessage({ type: "cancel" });
   }, "danger");
@@ -28187,6 +28203,7 @@ function renderExportPane() {
     fld("Resolution", res),
     fld("Frame rate", fps),
     fld("Quality", quality),
+    mbpsField,
     h("label", { class: "check" }, audio, "Include audio"),
     fld("File name", name),
     summary,
@@ -28198,6 +28215,7 @@ function renderExportPane() {
   );
 }
 async function runExport(o) {
+  if (pane !== "export" || !$("#exp-progress")) setPane("export");
   const el = $("#pane-export");
   const prog = $("#exp-progress");
   const bar = prog.querySelector("i");
@@ -28430,6 +28448,20 @@ async function init() {
     if (!playing) draw();
   });
   video.addEventListener("loadeddata", () => draw(), { once: true });
+  if (!item.thumbKey) {
+    video.addEventListener("seeked", async () => {
+      try {
+        const tc = document.createElement("canvas");
+        tc.width = 320;
+        tc.height = Math.max(1, Math.round(320 * canvas.height / canvas.width));
+        tc.getContext("2d").drawImage(canvas, 0, 0, tc.width, tc.height);
+        const b = await new Promise((r) => tc.toBlob(r, "image/jpeg", 0.8));
+        await putBlob(`${item.id}:thumb`, b);
+        item = await updateItem(item.id, { thumbKey: `${item.id}:thumb` });
+      } catch {
+      }
+    }, { once: true });
+  }
   window.__editorReady = true;
   makeThumbnails(sourceBlob, duration).then((t) => {
     thumbs = t;

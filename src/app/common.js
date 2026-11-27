@@ -4,26 +4,50 @@ import { restrictionReason } from '../screenshot/capture-controller.js';
 import { getBlob } from '../storage/db.js';
 import { formatBytes, formatDate, formatDuration } from '../shared/format.js';
 
+/**
+ * Open web tabs. Without site access Chrome hides tab URLs and titles from extension pages (the
+ * extension deliberately has no "tabs" permission), so such tabs are listed anonymously.
+ */
 export async function capturableTabs() {
-  const tabs = await chrome.tabs.query({});
+  const tabs = await chrome.tabs.query({ windowType: 'normal' });
   const self = chrome.runtime.getURL('');
-  return tabs.filter((t) => t.url && !t.url.startsWith(self));
+  return tabs.filter((t) => !(t.url || '').startsWith(self));
 }
 
-export function tabSelect(tabs, selectedId) {
+export async function hasAllSitesAccess() {
+  return chrome.permissions.contains({ origins: ['<all_urls>'] });
+}
+
+/** Tab chooser; when tab details are hidden it offers the optional site-access grant. */
+export function tabSelect(tabs, selectedId, onAccessGranted) {
   const s = h('select', { class: 'grow', style: { maxWidth: '520px' } });
   if (!tabs.length) s.append(h('option', { value: '' }, 'No open tabs'));
-  for (const t of tabs) {
-    const bad = restrictionReason(t.url);
-    s.append(h('option', { value: t.id, selected: t.id === selectedId, disabled: !!bad }, `${bad ? '⛔ ' : ''}${t.title || t.url}`.slice(0, 110)));
-  }
-  return s;
+  const hidden = tabs.some((t) => !t.url);
+  tabs.forEach((t, i) => {
+    const bad = t.url ? restrictionReason(t.url) : null;
+    const label = t.url ? `${bad ? '⛔ ' : ''}${t.title || t.url}` : `Tab ${i + 1}${t.active ? ' (active in its window)' : ''}`;
+    s.append(h('option', { value: t.id, selected: t.id === selectedId, disabled: !!bad }, label.slice(0, 110)));
+  });
+  if (!hidden) return s;
+  const allow = h('button', { class: 'btn', type: 'button' }, 'Show tab names (allow site access)');
+  allow.addEventListener('click', async () => {
+    try { if (await chrome.permissions.request({ origins: ['<all_urls>'] })) onAccessGranted?.(); } catch (e) { toast(e.message, 'error'); }
+  });
+  return h('div', { class: 'col grow', style: { gap: '6px' } }, s,
+    h('div', { class: 'small muted row wrap' }, 'Chrome hides tab names until you allow site access. The toolbar icon on a page needs no extra access.', allow));
+}
+
+export function selectedTabId(el) {
+  return Number((el.tagName === 'SELECT' ? el : el.querySelector('select')).value);
 }
 
 /** Ask for host permission (needed because the capture is started from the dashboard, not the popup). */
 export async function ensureHostAccess(tab) {
   let origin;
-  try { const u = new URL(tab.url); origin = u.protocol === 'file:' ? 'file:///*' : `${u.origin}/*`; } catch { return false; }
+  if (!tab.url) origin = '<all_urls>';
+  else {
+    try { const u = new URL(tab.url); origin = u.protocol === 'file:' ? 'file:///*' : `${u.origin}/*`; } catch { return false; }
+  }
   if (await chrome.permissions.contains({ origins: [origin] })) return true;
   try {
     return await chrome.permissions.request({ origins: [origin] });
@@ -33,7 +57,11 @@ export async function ensureHostAccess(tab) {
 }
 
 export async function startTabCapture(tabId, mode) {
-  const tab = await chrome.tabs.get(Number(tabId));
+  let tab = await chrome.tabs.get(Number(tabId));
+  if (!tab.url) {
+    if (!(await ensureHostAccess(tab))) throw new Error('Site access is required to capture a tab from the dashboard. (Tip: clicking the toolbar icon on the page works without granting access.)');
+    tab = await chrome.tabs.get(tab.id);
+  }
   const reason = restrictionReason(tab.url);
   if (reason && mode !== 'visible') throw new Error(reason);
   if (!(await ensureHostAccess(tab))) throw new Error('Site access is required to capture a tab from the dashboard. (Tip: clicking the toolbar icon on the page works without granting access.)');

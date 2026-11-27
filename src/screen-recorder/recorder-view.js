@@ -4,7 +4,7 @@ import { h, icon, send, toast } from '../shared/ui.js';
 import { getSettings, saveSettings } from '../shared/settings.js';
 import { formatBytes, formatDuration } from '../shared/format.js';
 import { webcamRect } from '../webcam/webcam-layout.js';
-import { capturableTabs, tabSelect, ensureHostAccess } from '../app/common.js';
+import { capturableTabs, tabSelect, selectedTabId, ensureHostAccess } from '../app/common.js';
 import { restrictionReason } from '../screenshot/capture-controller.js';
 import { RESOLUTIONS } from './codecs.js';
 
@@ -76,7 +76,7 @@ export async function renderRecorder({ view, params, head }) {
 
   // ---------------------------------------------------------------- source
   const tabs = await capturableTabs();
-  const tabSel = tabSelect(tabs.filter((t) => !restrictionReason(t.url)), Number(params.get('tab')) || undefined);
+  const tabSel = tabSelect(tabs.filter((t) => !t.url || !restrictionReason(t.url)), Number(params.get('tab')) || undefined, () => dispatchEvent(new HashChangeEvent('hashchange')));
   let source = s.recSource === 'tab' ? 'tab' : 'screen';
   const srcSeg = h('div', { class: 'seg', id: 'src-seg' });
   const srcNote = h('div', { class: 'muted small' });
@@ -207,7 +207,7 @@ export async function renderRecorder({ view, params, head }) {
     try {
       let req = { source, config: s };
       if (source === 'tab') {
-        const tab = await chrome.tabs.get(Number(tabSel.value)).catch(() => null);
+        const tab = await chrome.tabs.get(selectedTabId(tabSel)).catch(() => null);
         if (!tab) throw new Error('Choose a tab to record.');
         if (!(await ensureHostAccess(tab))) throw new Error('Site access is needed to record a tab from the dashboard. Alternatively use the popup on that tab.');
         await chrome.tabs.update(tab.id, { active: true });

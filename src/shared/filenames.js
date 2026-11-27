@@ -6,6 +6,11 @@ export function siteName(url, title) {
     const u = new URL(url);
     if (u.protocol === 'file:') return decodeURIComponent(u.pathname.split('/').pop() || 'File').replace(/\.[a-z0-9]+$/i, '');
     let h = u.hostname.replace(/^www\d?\./, '');
+    if (/^(\d+\.){3}\d+$|^\[|:|^localhost$/i.test(h)) {
+      // IP address / localhost: the page title is more meaningful than "127"
+      const t = (title || '').split(/[\s|–—-]+/).filter(Boolean).slice(0, 3).join('_');
+      return t || 'Localhost';
+    }
     const parts = h.split('.');
     // google.com -> Google, docs.github.com -> Github, bbc.co.uk -> Bbc
     let main = parts.length >= 3 && parts[parts.length - 2].length <= 3 ? parts[parts.length - 3] : parts.length >= 2 ? parts[parts.length - 2] : parts[0];

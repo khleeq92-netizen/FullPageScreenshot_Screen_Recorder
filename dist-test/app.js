@@ -476,26 +476,48 @@ function formatDate(ts) {
 
 // src/app/common.js
 async function capturableTabs() {
-  const tabs = await chrome.tabs.query({});
+  const tabs = await chrome.tabs.query({ windowType: "normal" });
   const self = chrome.runtime.getURL("");
-  return tabs.filter((t) => t.url && !t.url.startsWith(self));
+  return tabs.filter((t) => !(t.url || "").startsWith(self));
 }
-function tabSelect(tabs, selectedId) {
+function tabSelect(tabs, selectedId, onAccessGranted) {
   const s = h("select", { class: "grow", style: { maxWidth: "520px" } });
   if (!tabs.length) s.append(h("option", { value: "" }, "No open tabs"));
-  for (const t of tabs) {
-    const bad = restrictionReason(t.url);
-    s.append(h("option", { value: t.id, selected: t.id === selectedId, disabled: !!bad }, `${bad ? "\u26D4 " : ""}${t.title || t.url}`.slice(0, 110)));
-  }
-  return s;
+  const hidden = tabs.some((t) => !t.url);
+  tabs.forEach((t, i) => {
+    const bad = t.url ? restrictionReason(t.url) : null;
+    const label = t.url ? `${bad ? "\u26D4 " : ""}${t.title || t.url}` : `Tab ${i + 1}${t.active ? " (active in its window)" : ""}`;
+    s.append(h("option", { value: t.id, selected: t.id === selectedId, disabled: !!bad }, label.slice(0, 110)));
+  });
+  if (!hidden) return s;
+  const allow = h("button", { class: "btn", type: "button" }, "Show tab names (allow site access)");
+  allow.addEventListener("click", async () => {
+    try {
+      if (await chrome.permissions.request({ origins: ["<all_urls>"] })) onAccessGranted?.();
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  });
+  return h(
+    "div",
+    { class: "col grow", style: { gap: "6px" } },
+    s,
+    h("div", { class: "small muted row wrap" }, "Chrome hides tab names until you allow site access. The toolbar icon on a page needs no extra access.", allow)
+  );
+}
+function selectedTabId(el) {
+  return Number((el.tagName === "SELECT" ? el : el.querySelector("select")).value);
 }
 async function ensureHostAccess(tab) {
   let origin;
-  try {
-    const u = new URL(tab.url);
-    origin = u.protocol === "file:" ? "file:///*" : `${u.origin}/*`;
-  } catch {
-    return false;
+  if (!tab.url) origin = "<all_urls>";
+  else {
+    try {
+      const u = new URL(tab.url);
+      origin = u.protocol === "file:" ? "file:///*" : `${u.origin}/*`;
+    } catch {
+      return false;
+    }
   }
   if (await chrome.permissions.contains({ origins: [origin] })) return true;
   try {
@@ -506,7 +528,11 @@ async function ensureHostAccess(tab) {
   }
 }
 async function startTabCapture(tabId, mode) {
-  const tab = await chrome.tabs.get(Number(tabId));
+  let tab = await chrome.tabs.get(Number(tabId));
+  if (!tab.url) {
+    if (!await ensureHostAccess(tab)) throw new Error("Site access is required to capture a tab from the dashboard. (Tip: clicking the toolbar icon on the page works without granting access.)");
+    tab = await chrome.tabs.get(tab.id);
+  }
   const reason = restrictionReason(tab.url);
   if (reason && mode !== "visible") throw new Error(reason);
   if (!await ensureHostAccess(tab)) throw new Error("Site access is required to capture a tab from the dashboard. (Tip: clicking the toolbar icon on the page works without granting access.)");
@@ -682,7 +708,7 @@ async function renderRecorder({ view: view2, params, head: head2 }) {
     grantBox.append(h("b", {}, "Permission needed"), h("span", {}, "The recorder runs in a hidden background document that cannot show permission prompts. Grant access once here; Chrome remembers it for this extension."), h("div", {}, b));
   }
   const tabs = await capturableTabs();
-  const tabSel = tabSelect(tabs.filter((t) => !restrictionReason(t.url)), Number(params.get("tab")) || void 0);
+  const tabSel = tabSelect(tabs.filter((t) => !t.url || !restrictionReason(t.url)), Number(params.get("tab")) || void 0, () => dispatchEvent(new HashChangeEvent("hashchange")));
   let source = s.recSource === "tab" ? "tab" : "screen";
   const srcSeg = h("div", { class: "seg", id: "src-seg" });
   const srcNote = h("div", { class: "muted small" });
@@ -875,7 +901,7 @@ async function renderRecorder({ view: view2, params, head: head2 }) {
     try {
       let req = { source, config: s };
       if (source === "tab") {
-        const tab = await chrome.tabs.get(Number(tabSel.value)).catch(() => null);
+        const tab = await chrome.tabs.get(selectedTabId(tabSel)).catch(() => null);
         if (!tab) throw new Error("Choose a tab to record.");
         if (!await ensureHostAccess(tab)) throw new Error("Site access is needed to record a tab from the dashboard. Alternatively use the popup on that tab.");
         await chrome.tabs.update(tab.id, { active: true });
@@ -1309,6 +1335,10 @@ function siteName(url, title) {
     const u = new URL(url);
     if (u.protocol === "file:") return decodeURIComponent(u.pathname.split("/").pop() || "File").replace(/\.[a-z0-9]+$/i, "");
     let h2 = u.hostname.replace(/^www\d?\./, "");
+    if (/^(\d+\.){3}\d+$|^\[|:|^localhost$/i.test(h2)) {
+      const t = (title || "").split(/[\s|–—-]+/).filter(Boolean).slice(0, 3).join("_");
+      return t || "Localhost";
+    }
     const parts = h2.split(".");
     let main = parts.length >= 3 && parts[parts.length - 2].length <= 3 ? parts[parts.length - 3] : parts.length >= 2 ? parts[parts.length - 2] : parts[0];
     if (!main) main = title || "Page";
@@ -1388,8 +1418,8 @@ async function renderSettings({ view: view2, head: head2 }) {
   const shotPreview = h("span", { class: "small mono" });
   const vidPreview = h("span", { class: "small mono" });
   const updPreview = () => {
-    shotPreview.textContent = `${expandPattern(s.screenshotPattern, { url: "https://www.google.com", title: "Google" })}.jpg`;
-    vidPreview.textContent = `${expandPattern(s.videoPattern, { url: "https://www.google.com", title: "Google" })}.webm`;
+    shotPreview.textContent = `${expandPattern(s.screenshotPattern, { url: "https://google.example", title: "Google" })}.jpg`;
+    vidPreview.textContent = `${expandPattern(s.videoPattern, { url: "https://google.example", title: "Google" })}.webm`;
   };
   updPreview();
   const usage = h("span", { class: "muted" });
@@ -1548,11 +1578,11 @@ async function lastWebTab() {
 async function renderDashboard() {
   const tabs = await capturableTabs();
   const def = await lastWebTab();
-  const sel = tabSelect(tabs, def?.id);
+  const sel = tabSelect(tabs, def?.id, () => route());
   const capture = h("button", { class: "hero-btn capture", id: "dash-capture", html: `${icon("page")}<span>CAPTURE FULL PAGE</span><small>Scrolls and stitches the selected tab at full device resolution</small>` });
   capture.addEventListener("click", async () => {
     try {
-      await startTabCapture(sel.value, "full");
+      await startTabCapture(selectedTabId(sel), "full");
       toast("Capturing\u2026 keep the page visible.");
     } catch (e) {
       toast(e.message, "error", 6e3);
@@ -1580,7 +1610,7 @@ async function renderDashboard() {
         { class: "row wrap" },
         sec("dash-visible", "visible", "Capture Visible Screen", async () => {
           try {
-            await startTabCapture(sel.value, "visible");
+            await startTabCapture(selectedTabId(sel), "visible");
           } catch (e) {
             toast(e.message, "error");
           }
@@ -1605,7 +1635,7 @@ async function renderStudio() {
   const s = await getSettings();
   const tabs = await capturableTabs();
   const def = await lastWebTab();
-  const sel = tabSelect(tabs, def?.id);
+  const sel = tabSelect(tabs, def?.id, () => route());
   const field = (label, el) => h("label", { class: "field" }, h("span", {}, label), el);
   const select = (key, opts) => {
     const el = h("select", {});
@@ -1626,7 +1656,7 @@ async function renderStudio() {
   const progress = h("div", { class: "card col", id: "studio-progress", style: { display: "none" } });
   const go = (mode) => async () => {
     try {
-      await startTabCapture(sel.value, mode);
+      await startTabCapture(selectedTabId(sel), mode);
     } catch (e) {
       toast(e.message, "error", 6e3);
     }

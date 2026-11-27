@@ -2,7 +2,7 @@
 import { $, $$, h, icon, send, toast, applyTheme } from '../shared/ui.js';
 import { getSettings, saveSettings } from '../shared/settings.js';
 import { listItems, putItem, putBlob, newId } from '../storage/db.js';
-import { capturableTabs, tabSelect, startTabCapture, captureCard, itemUrl } from './common.js';
+import { capturableTabs, tabSelect, selectedTabId, startTabCapture, captureCard, itemUrl } from './common.js';
 import { renderRecorder } from '../screen-recorder/recorder-view.js';
 import { renderHistory } from '../history/history-view.js';
 import { renderSettings } from '../settings/settings-view.js';
@@ -29,10 +29,10 @@ async function lastWebTab() {
 async function renderDashboard() {
   const tabs = await capturableTabs();
   const def = await lastWebTab();
-  const sel = tabSelect(tabs, def?.id);
+  const sel = tabSelect(tabs, def?.id, () => route());
   const capture = h('button', { class: 'hero-btn capture', id: 'dash-capture', html: `${icon('page')}<span>CAPTURE FULL PAGE</span><small>Scrolls and stitches the selected tab at full device resolution</small>` });
   capture.addEventListener('click', async () => {
-    try { await startTabCapture(sel.value, 'full'); toast('Capturing… keep the page visible.'); } catch (e) { toast(e.message, 'error', 6000); }
+    try { await startTabCapture(selectedTabId(sel), 'full'); toast('Capturing… keep the page visible.'); } catch (e) { toast(e.message, 'error', 6000); }
   });
   const record = h('button', { class: 'hero-btn record', id: 'dash-record', html: `${icon('record')}<span>RECORD SCREEN</span><small>Tab, window or entire screen · microphone · webcam</small>` });
   record.addEventListener('click', () => { location.hash = 'recorder'; });
@@ -44,7 +44,7 @@ async function renderDashboard() {
       h('div', { class: 'row' }, h('b', {}, 'Tab to capture'), sel),
       h('div', { class: 'big-actions' }, capture, record),
       h('div', { class: 'row wrap' },
-        sec('dash-visible', 'visible', 'Capture Visible Screen', async () => { try { await startTabCapture(sel.value, 'visible'); } catch (e) { toast(e.message, 'error'); } }),
+        sec('dash-visible', 'visible', 'Capture Visible Screen', async () => { try { await startTabCapture(selectedTabId(sel), 'visible'); } catch (e) { toast(e.message, 'error'); } }),
         sec('dash-editor', 'editor', 'Open Video Editor', () => { location.hash = 'editor'; }),
         sec('dash-history', 'history', 'Recent Captures', () => { location.hash = 'history'; }),
         sec('dash-settings', 'settings', 'Settings', () => { location.hash = 'settings'; })),
@@ -59,7 +59,7 @@ async function renderStudio() {
   const s = await getSettings();
   const tabs = await capturableTabs();
   const def = await lastWebTab();
-  const sel = tabSelect(tabs, def?.id);
+  const sel = tabSelect(tabs, def?.id, () => route());
   const field = (label, el) => h('label', { class: 'field' }, h('span', {}, label), el);
   const select = (key, opts) => {
     const el = h('select', {});
@@ -78,7 +78,7 @@ async function renderStudio() {
     return el;
   };
   const progress = h('div', { class: 'card col', id: 'studio-progress', style: { display: 'none' } });
-  const go = (mode) => async () => { try { await startTabCapture(sel.value, mode); } catch (e) { toast(e.message, 'error', 6000); } };
+  const go = (mode) => async () => { try { await startTabCapture(selectedTabId(sel), mode); } catch (e) { toast(e.message, 'error', 6000); } };
   const items = (await listItems()).filter((i) => i.kind === 'screenshot').slice(0, 12);
   view.replaceChildren(
     head('Screenshot Studio', 'Capture options, progress and your screenshots. Exports happen in the preview window.'),

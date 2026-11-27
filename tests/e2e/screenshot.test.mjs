@@ -13,7 +13,7 @@ async function openAndCapture(env, url, path_, { mode = 'full', settings = null 
   await page.goto(`${url}${path_}`);
   await page.bringToFront();
   await page.waitForTimeout(300);
-  const tabId = await tabIdOf(env.ctrl, path_.split('?')[0]);
+  const tabId = await tabIdOf(env.ctrl, `${url}${path_}`);
   const r = await sendMsg(env.ctrl, { type: 'capture:start-wait', mode, tabId, openEditor: false });
   return { page, r, tabId };
 }

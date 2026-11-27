@@ -9,7 +9,7 @@ import { startServer } from '../fixtures/server.mjs';
 const args = process.argv.slice(2);
 const gi = args.indexOf('--grep'); const grep = gi >= 0 ? new RegExp(args[gi + 1], 'i') : null;
 const suites = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--grep');
-const all = suites.length ? suites : ['screenshot', 'recording-tab', 'recording-screen', 'editor', 'privacy'];
+const all = suites.length ? suites : ['screenshot', 'recording-tab', 'recording-screen', 'editor', 'privacy', 'performance'];
 
 execFileSync('node', ['build.mjs', '--test'], { cwd: ROOT, stdio: 'ignore' });
 const { server, url } = await startServer();

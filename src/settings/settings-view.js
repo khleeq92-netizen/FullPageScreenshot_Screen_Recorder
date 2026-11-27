@@ -17,8 +17,8 @@ export async function renderSettings({ view, head }) {
 
   const shotPreview = h('span', { class: 'small mono' }); const vidPreview = h('span', { class: 'small mono' });
   const updPreview = () => {
-    shotPreview.textContent = `${expandPattern(s.screenshotPattern, { url: 'https://www.google.com', title: 'Google' })}.jpg`;
-    vidPreview.textContent = `${expandPattern(s.videoPattern, { url: 'https://www.google.com', title: 'Google' })}.webm`;
+    shotPreview.textContent = `${expandPattern(s.screenshotPattern, { url: 'https://google.example', title: 'Google' })}.jpg`;
+    vidPreview.textContent = `${expandPattern(s.videoPattern, { url: 'https://google.example', title: 'Google' })}.webm`;
   };
   updPreview();
   const usage = h('span', { class: 'muted' });

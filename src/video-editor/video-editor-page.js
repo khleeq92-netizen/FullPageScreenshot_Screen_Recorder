@@ -493,7 +493,9 @@ function exportPlan(opts) {
   const size = scaledOutputSize(project, srcW, srcH, opts.resolution);
   const sfps = sourceFps();
   const fps = opts.fps === 'source' ? Math.min(60, sfps) : Math.min(Number(opts.fps), Math.max(sfps, 1));
-  const vbr = Math.round(Math.min(80e6, Math.max(0.8e6, size.width * size.height * fps * (BPP[opts.quality] || BPP.high))));
+  const vbr = opts.quality === 'custom' && Number(opts.mbps) > 0
+    ? Math.round(Math.min(120, Math.max(0.2, Number(opts.mbps))) * 1e6)
+    : Math.round(Math.min(80e6, Math.max(0.8e6, size.width * size.height * fps * (BPP[opts.quality] || BPP.high))));
   const abr = opts.quality === 'max' ? 192000 : 128000;
   const hasAudio = opts.audio && !!info.audioCodec && !project.muted;
   const est = ((vbr + (hasAudio ? abr : 0)) * dur()) / 8;
@@ -511,27 +513,30 @@ function renderExportPane() {
   const res = sel('exp-res', [['source', `Same as source (${n.width}×${n.height})`], ...[2160, 1440, 1080, 720, 480].filter((r) => r < short).map((r) => [r, `${r}p`])], opts.resolution);
   const sfps = sourceFps();
   const fps = sel('exp-fps', [['source', `Source (${sfps} fps)`], ...[60, 30, 24].filter((f) => f < sfps).map((f) => [f, `${f} fps`])], opts.fps);
-  const quality = sel('exp-quality', [['standard', 'Standard'], ['high', 'High'], ['max', 'Maximum']], opts.quality);
+  const quality = sel('exp-quality', [['standard', 'Standard'], ['high', 'High'], ['max', 'Maximum'], ['custom', 'Custom bitrate']], opts.quality);
+  const mbps = h('input', { type: 'number', id: 'exp-mbps', min: 0.2, max: 120, step: 0.5, value: 8 });
+  const mbpsField = fld('Video bitrate (Mbps)', mbps);
   const audio = h('input', { type: 'checkbox', id: 'exp-audio', checked: !!info.audioCodec && !project.muted, disabled: !info.audioCodec });
   const name = h('input', { type: 'text', id: 'exp-name', value: expandPattern(settings.videoPattern, { url: item.url, title: item.title, date: item.createdAt }) });
   const summary = h('div', { class: 'notice small', id: 'exp-summary' });
   const ident = isIdentity(project);
   const upd = () => {
-    const o = { format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, audio: audio.checked };
+    mbpsField.style.display = quality.value === 'custom' ? '' : 'none';
+    const o = { format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, mbps: mbps.value, audio: audio.checked };
     const pl = exportPlan(o);
     const copy = ident && o.resolution === 'source' && o.fps === 'source' && o.format === item.format;
     summary.textContent = copy
       ? `No edits: the original ${item.format.toUpperCase()} file (${formatBytes(item.size)}) is saved unchanged — no re-encoding, no quality loss.`
       : `${pl.width}×${pl.height} · ${pl.fps} fps · ${(pl.vbr / 1e6).toFixed(1)} Mbps video${pl.hasAudio ? ` + ${pl.abr / 1000} kbps audio` : ' · no audio'} · ${formatDuration(dur())} · estimated ${formatBytes(pl.est)}`;
   };
-  for (const c of [format, res, fps, quality, audio]) c.addEventListener('change', upd);
+  for (const c of [format, res, fps, quality, audio, mbps]) c.addEventListener('change', upd);
   upd();
   const prog = h('div', { class: 'col', id: 'exp-progress', style: { display: 'none' } }, h('div', { class: 'progress' }, h('i')), h('span', { class: 'small', id: 'exp-status' }));
-  const go = btn('exp-go', 'download', 'Export video', () => runExport({ format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, audio: audio.checked, name: name.value }), 'primary');
+  const go = btn('exp-go', 'download', 'Export video', () => runExport({ format: format.value, resolution: res.value, fps: fps.value, quality: quality.value, mbps: mbps.value, audio: audio.checked, name: name.value }), 'primary');
   const cancel = btn('exp-cancel', 'x', 'Cancel', () => { exportWorker?.postMessage({ type: 'cancel' }); }, 'danger');
   cancel.style.display = 'none';
   el.replaceChildren(h('h3', {}, 'Export'),
-    fld('Format', format), fld('Resolution', res), fld('Frame rate', fps), fld('Quality', quality),
+    fld('Format', format), fld('Resolution', res), fld('Frame rate', fps), fld('Quality', quality), mbpsField,
     h('label', { class: 'check' }, audio, 'Include audio'), fld('File name', name), summary,
     h('div', { class: 'row' }, go, cancel), prog,
     h('div', { class: 'small muted' }, 'Video is re-encoded locally with the browser’s WebCodecs encoders. MP4 is a real H.264 encode, not a renamed WebM. Output is never upscaled beyond the source resolution or frame rate.'),
@@ -539,6 +544,7 @@ function renderExportPane() {
 }
 
 async function runExport(o) {
+  if (pane !== 'export' || !$('#exp-progress')) setPane('export');
   const el = $('#pane-export'); const prog = $('#exp-progress'); const bar = prog.querySelector('i'); const status = $('#exp-status');
   const plan = exportPlan(o);
   const name = o.name.trim() || expandPattern(settings.videoPattern, { url: item.url, title: item.title, date: item.createdAt });
@@ -673,6 +679,17 @@ async function init() {
   undoStack.length = 0; updateUndo();
   video.addEventListener('seeked', () => { if (!playing) draw(); });
   video.addEventListener('loadeddata', () => draw(), { once: true });
+  if (!item.thumbKey) {
+    // Imported / recovered videos get a history thumbnail from the first rendered frame.
+    video.addEventListener('seeked', async () => {
+      try {
+        const tc = document.createElement('canvas'); tc.width = 320; tc.height = Math.max(1, Math.round(320 * canvas.height / canvas.width));
+        tc.getContext('2d').drawImage(canvas, 0, 0, tc.width, tc.height);
+        const b = await new Promise((r) => tc.toBlob(r, 'image/jpeg', 0.8));
+        await putBlob(`${item.id}:thumb`, b); item = await updateItem(item.id, { thumbKey: `${item.id}:thumb` });
+      } catch { /* thumbnail is optional */ }
+    }, { once: true });
+  }
   window.__editorReady = true;
   // Background analysis for the timeline
   makeThumbnails(sourceBlob, duration).then((t) => { thumbs = t; renderTimeline(); }).catch(() => {});

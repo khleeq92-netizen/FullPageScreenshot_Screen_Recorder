@@ -306,6 +306,10 @@ function siteName(url, title) {
     const u = new URL(url);
     if (u.protocol === "file:") return decodeURIComponent(u.pathname.split("/").pop() || "File").replace(/\.[a-z0-9]+$/i, "");
     let h2 = u.hostname.replace(/^www\d?\./, "");
+    if (/^(\d+\.){3}\d+$|^\[|:|^localhost$/i.test(h2)) {
+      const t = (title || "").split(/[\s|–—-]+/).filter(Boolean).slice(0, 3).join("_");
+      return t || "Localhost";
+    }
     const parts = h2.split(".");
     let main = parts.length >= 3 && parts[parts.length - 2].length <= 3 ? parts[parts.length - 3] : parts.length >= 2 ? parts[parts.length - 2] : parts[0];
     if (!main) main = title || "Page";
@@ -361,30 +365,39 @@ function downloadBlob(blob, baseName, ext, settings2, { saveAs } = {}) {
   const url = URL.createObjectURL(blob);
   const filename = buildDownloadPath(baseName, ext, settings2);
   return new Promise((resolve, reject) => {
-    chrome.downloads.download({ url, filename, conflictAction: "uniquify", saveAs: saveAs ?? !!settings2?.askWhereToSave }, (id) => {
-      if (chrome.runtime.lastError || id == null) {
+    let id = null;
+    let settled = false;
+    const finish = (state, error) => {
+      if (settled) return;
+      settled = true;
+      chrome.downloads.onChanged.removeListener(onChanged);
+      setTimeout(() => URL.revokeObjectURL(url), 1e4);
+      if (state === "complete") resolve({ id, filename });
+      else reject(new Error(error === "USER_CANCELED" ? "Download cancelled." : `Download interrupted (${error || "unknown reason"}). Try again or choose another folder.`));
+    };
+    const check = (d) => {
+      if (!d) return;
+      const state = typeof d.state === "string" ? d.state : d.state?.current;
+      if (state === "complete") finish("complete");
+      else if (state === "interrupted") {
+        if (d.error && typeof d.error === "string") finish("interrupted", d.error);
+        else chrome.downloads.search({ id }, ([item2]) => finish("interrupted", item2?.error));
+      }
+    };
+    const onChanged = (d) => {
+      if (id != null && d.id === id) check(d);
+    };
+    chrome.downloads.onChanged.addListener(onChanged);
+    chrome.downloads.download({ url, filename, conflictAction: "uniquify", saveAs: saveAs ?? !!settings2?.askWhereToSave }, (newId) => {
+      if (chrome.runtime.lastError || newId == null) {
+        settled = true;
+        chrome.downloads.onChanged.removeListener(onChanged);
         URL.revokeObjectURL(url);
         reject(new Error(chrome.runtime.lastError?.message || "Download was not started"));
         return;
       }
-      const onChanged = (d) => {
-        if (d.id !== id || !d.state) return;
-        if (d.state.current === "complete") {
-          cleanup();
-          resolve({ id, filename });
-        } else if (d.state.current === "interrupted") {
-          cleanup();
-          chrome.downloads.search({ id }, ([item2]) => {
-            const reason = item2?.error || "unknown reason";
-            reject(new Error(reason === "USER_CANCELED" ? "Download cancelled." : `Download interrupted (${reason}). Try again or choose another folder.`));
-          });
-        }
-      };
-      const cleanup = () => {
-        chrome.downloads.onChanged.removeListener(onChanged);
-        setTimeout(() => URL.revokeObjectURL(url), 1e4);
-      };
-      chrome.downloads.onChanged.addListener(onChanged);
+      id = newId;
+      chrome.downloads.search({ id }, ([item2]) => check(item2));
     });
   });
 }

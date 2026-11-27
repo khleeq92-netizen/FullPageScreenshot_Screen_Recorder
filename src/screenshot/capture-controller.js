@@ -50,11 +50,14 @@ async function captureViewport(windowId) {
   throw new CaptureError('Screen capture was rate-limited by Chrome repeatedly.', 'rate');
 }
 
-async function injectAgent(tabId) {
+async function injectAgent(tabId, url = '') {
   try {
     await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, files: ['page-agent.js'] });
   } catch (e) {
     const msg = String(e?.message || e);
+    if (/^file:/i.test(url)) {
+      throw new CaptureError('To capture local files, open chrome://extensions, click “Details” on FullPage HD Capture and turn on “Allow access to file URLs”.', 'file-access');
+    }
     if (/Cannot access|cannot be scripted|extensions gallery|chrome:\/\//i.test(msg)) {
       throw new CaptureError('Chrome does not allow extensions to access this page, so a full-page capture is not possible here. You can still use “Capture Visible Screen”.', 'restricted');
     }
@@ -99,7 +102,7 @@ export async function captureVisible(tab, settings, { onProgress = () => {} } = 
   const reason = restrictionReason(tab.url);
   let info = { viewportWidth: tab.width, viewportHeight: tab.height, dpr: 1, url: tab.url, title: tab.title };
   if (!reason) {
-    try { await injectAgent(tab.id); info = await agentCall(tab.id, 'visibleInfo'); } catch { /* visible capture still works */ }
+    try { await injectAgent(tab.id, tab.url); info = await agentCall(tab.id, 'visibleInfo'); } catch { /* visible capture still works */ }
   }
   onProgress({ phase: 'capturing', progress: 0.5 });
   const bmp = await captureViewport(tab.windowId);
@@ -139,7 +142,7 @@ export async function captureFullPage(tab, settings, { onProgress = () => {}, is
   if (reason) throw new CaptureError(reason, 'restricted');
   const tabId = tab.id; const windowId = tab.windowId;
   await ensureTabVisible(tabId);
-  await injectAgent(tabId);
+  await injectAgent(tabId, tab.url);
 
   const id = newId('shot');
   const warnings = [];

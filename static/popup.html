@@ -27,7 +27,9 @@
   .rec-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .panel { display: none; }
   .panel.show { display: flex; }
-  .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .opt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .opt-grid select { width: 100%; }
+  html, body { overflow-x: hidden; }
   footer { padding: 8px 14px 12px; display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
 </style>
 </head>
