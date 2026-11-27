@@ -87,6 +87,8 @@ Run single suites with `xvfb-run -a node tests/e2e/run-e2e.mjs screenshot`, or s
 - a separate webcam track composited at the chosen position,
 - the exported file reopens in the editor.
 
+**performance** (4 tests): capture time and peak memory for 51 → 154 → 307 MP pages (memory stays flat, about 250 MB), a 2560×120,000 JPG export, a 60 s recording with flat memory, and media streams and the recorder document released after stop.
+
 **privacy** (7 tests):
 - production manifest permissions (no host access, no content scripts, local‑only CSP),
 - no network endpoints or upload APIs in the bundles,

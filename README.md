@@ -151,7 +151,7 @@ npm test
 npm run test:e2e
 ```
 
-`npm test` runs the unit tests: JPEG decoded by PIL, PDF checked by poppler, WebM duration, time mapping, filenames. `npm run test:e2e` drives real Chrome under Xvfb with the extension loaded. It covers 45 scenarios across screenshots, tab and screen recording, the editor and privacy, verified with ffprobe, ffmpeg, PIL and poppler.
+`npm test` runs the unit tests: JPEG decoded by PIL, PDF checked by poppler, WebM duration, time mapping, filenames. `npm run test:e2e` drives real Chrome under Xvfb with the extension loaded. It covers 54 scenarios across screenshots, tab and screen recording, the editor, privacy and performance, verified with ffprobe, ffmpeg, PIL and poppler.
 
 ## Privacy
 
