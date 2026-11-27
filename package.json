@@ -1,0 +1,30 @@
+{
+  "name": "fullpage-hd-capture",
+  "version": "1.0.0",
+  "description": "FullPage HD Capture – Chrome extension",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:test": "node build.mjs --test",
+    "watch": "node build.mjs --watch",
+    "test": "node tests/run-unit.mjs",
+    "test:e2e": "xvfb-run -a -s \"-screen 0 1920x1080x24\" node tests/e2e/run-e2e.mjs",
+    "package": "node build.mjs && node scripts/package.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khleeq92-netizen/FullPageScreenshot_Screen_Recorder.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/khleeq92-netizen/FullPageScreenshot_Screen_Recorder/issues"
+  },
+  "homepage": "https://github.com/khleeq92-netizen/FullPageScreenshot_Screen_Recorder#readme",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "mediabunny": "^1.66.5"
+  },
+  "private": true,
+  "type": "module"
+}

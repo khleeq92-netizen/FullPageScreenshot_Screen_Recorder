@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "FullPage HD Capture",
+  "short_name": "FullPage HD",
+  "version": "1.0.0",
+  "description": "Full-page HD screenshots (JPG/PDF), screen & tab recording with webcam, annotations and a built-in video editor. 100% local.",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "FullPage HD Capture",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "unlimitedStorage",
+    "downloads",
+    "offscreen",
+    "tabCapture",
+    "desktopCapture"
+  ],
+  "optional_host_permissions": ["<all_urls>"],
+  "commands": {
+    "capture-full-page": { "suggested_key": { "default": "Alt+Shift+P" }, "description": "Capture the entire page" },
+    "toggle-recording-pause": { "suggested_key": { "default": "Alt+Shift+K" }, "description": "Pause / resume the current recording" },
+    "stop-recording": { "suggested_key": { "default": "Alt+Shift+S" }, "description": "Stop the current recording" },
+    "toggle-annotation": { "description": "Toggle on-screen annotation while recording" }
+  },
+  "web_accessible_resources": [],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

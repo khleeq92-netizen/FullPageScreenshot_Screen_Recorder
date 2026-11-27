@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FullPage HD Capture</title>
+<link rel="stylesheet" href="ui.css">
+<style>
+  body { width: 380px; min-height: 200px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  header img { width: 26px; height: 26px; }
+  header b { font-size: 15px; }
+  main { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .tab-info { display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  .tab-info img { width: 16px; height: 16px; }
+  .tab-info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-info .u { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .heroes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .heroes .hero-btn { min-height: 92px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .actions .btn { justify-content: flex-start; }
+  .recent { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .recent a { display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--panel-2); aspect-ratio: 4/3; position: relative; }
+  .recent img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .recent span { position: absolute; left: 4px; bottom: 4px; font-size: 10px; background: rgba(0,0,0,.65); color: #fff; padding: 1px 5px; border-radius: 5px; }
+  .rec-card { display: flex; flex-direction: column; gap: 10px; }
+  .rec-time { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .rec-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .panel { display: none; }
+  .panel.show { display: flex; }
+  .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  footer { padding: 8px 14px 12px; display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icons/icon48.png" alt="">
+  <b class="grow">FullPage HD Capture</b>
+  <button class="btn ghost icon" id="open-settings" title="Settings"></button>
+</header>
+<main id="main"></main>
+<footer><span>Local only · nothing is uploaded</span><a href="#" id="open-app">Open dashboard</a></footer>
+<script type="module" src="popup.js"></script>
+</body>
+</html>
