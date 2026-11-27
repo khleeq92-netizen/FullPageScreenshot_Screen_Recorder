@@ -48,7 +48,7 @@ async function renderDashboard() {
         sec('dash-editor', 'editor', 'Open Video Editor', () => { location.hash = 'editor'; }),
         sec('dash-history', 'history', 'Recent Captures', () => { location.hash = 'history'; }),
         sec('dash-settings', 'settings', 'Settings', () => { location.hash = 'settings'; })),
-      h('div', { class: 'muted small' }, 'Tip: the quickest way is the toolbar icon on the page itself — ', h('kbd', {}, 'Alt+Shift+P'), ' captures the current page.')),
+      h('div', { class: 'muted small' }, 'Tip: the quickest way is the toolbar icon on the page itself — ', h('kbd', {}, 'Alt+Shift+S'), ' captures the current page.')),
     h('div', { class: 'section-title' }, h('h2', { class: 'grow' }, 'Recent captures'), h('a', { href: '#history' }, 'View all')),
     items.length ? h('div', { class: 'cards' }, items.map((it) => captureCard(it))) : h('div', { class: 'empty' }, 'Nothing captured yet.'),
   );

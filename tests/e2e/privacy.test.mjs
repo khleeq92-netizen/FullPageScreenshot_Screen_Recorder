@@ -121,4 +121,13 @@ export const tests = [
     assert.deepEqual(left, [0, 0, 0]);
     await h0.close();
   }],
+
+  ['keyboard shortcuts: all four default keys are actually assigned by Chrome', async (env) => {
+    const cmds = Object.fromEntries((await env.ctrl.evaluate(() => chrome.commands.getAll())).map((c) => [c.name, c.shortcut]));
+    assert.deepEqual(
+      { open: cmds._execute_action, capture: cmds['capture-full-page'], record: cmds['toggle-recording'], pause: cmds['toggle-recording-pause'] },
+      { open: 'Alt+Shift+F', capture: 'Alt+Shift+S', record: 'Alt+Shift+V', pause: 'Alt+Shift+K' },
+    );
+    for (const n of ['capture-visible', 'record-screen', 'stop-recording', 'toggle-annotation']) assert.ok(n in cmds, `${n} is available to assign`);
+  }],
 ];

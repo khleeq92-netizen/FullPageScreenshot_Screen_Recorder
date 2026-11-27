@@ -74,7 +74,7 @@ npm run package
 
 ## Usage
 
-**Screenshot:** open a page, click the toolbar icon, then **CAPTURE FULL PAGE** (or press <kbd>Alt+Shift+P</kbd>). Keep the tab visible while it scrolls. The preview opens with editing tools and JPG / PDF / PNG export.
+**Screenshot:** open a page, click the toolbar icon, then **CAPTURE FULL PAGE** (or press <kbd>Alt+Shift+S</kbd>). Keep the tab visible while it scrolls. The preview opens with editing tools and JPG / PDF / PNG export.
 
 **Recording:** click the toolbar icon, then **RECORD SCREEN**, then choose *Current tab* or *Entire screen / window*. Set the audio, webcam and countdown, then **Start recording**.
 - Tab recordings run in the background.
@@ -82,7 +82,22 @@ npm run package
 
 When you stop, the video editor opens.
 
-Keyboard shortcuts (change them at `chrome://extensions/shortcuts`): <kbd>Alt+Shift+P</kbd> capture page, <kbd>Alt+Shift+K</kbd> pause/resume, <kbd>Alt+Shift+S</kbd> stop, plus an optional annotate toggle. The editors use Space (play), S (split), Delete, Ctrl+Z / Ctrl+Y, and V / A / R / E / H / T / P / B / C to pick tools in the screenshot editor.
+### Keyboard shortcuts
+
+They work even when the popup is closed (on macOS use <kbd>⌥ Option</kbd> + <kbd>⇧ Shift</kbd>):
+
+| Shortcut | Action |
+|---|---|
+| <kbd>Alt+Shift+F</kbd> | Open the FullPage HD Capture popup |
+| <kbd>Alt+Shift+S</kbd> | Capture the full page (screenshot) |
+| <kbd>Alt+Shift+V</kbd> | Start recording the current tab; press again to stop and save |
+| <kbd>Alt+Shift+K</kbd> | Pause / resume the recording |
+
+There are also four optional actions without a default key, which you can assign at `chrome://extensions/shortcuts`: capture the visible area, record the entire screen or a window, stop recording, and draw on the page while recording. The keys are listed in the popup (**Keyboard shortcuts**) and in **Settings → Keyboard shortcuts**.
+
+Chrome allows an extension at most four default shortcuts and silently skips keys it reserves, such as <kbd>Alt+Shift+P</kbd> and <kbd>Alt+Shift+R</kbd>, so these four were checked to be accepted.
+
+Inside the editors: Space (play), S (split), Delete, Ctrl+Z / Ctrl+Y, and V / A / R / E / H / T / P / B / C to pick tools in the screenshot editor.
 
 ## Permissions (and why)
 

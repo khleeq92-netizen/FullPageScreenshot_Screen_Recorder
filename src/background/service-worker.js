@@ -341,15 +341,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---------------------------------------------------------------------------------------------
 // Keyboard shortcuts
 // ---------------------------------------------------------------------------------------------
+async function shortcutError(message) {
+  // No UI is open when a shortcut is used: flag it on the badge and keep the message for the popup.
+  await setSession({ shortcutError: { message, at: Date.now() } });
+  await setBadge('!', '#dc2626');
+  setTimeout(() => getSession('recState').then((st) => { if (!st?.active && !capture) setBadge('', null); }), 6000);
+}
+
 chrome.commands.onCommand.addListener(async (command, tab) => {
   try {
+    const st = await getSession('recState');
     if (command === 'capture-full-page') await startCapture({ mode: 'full', tabId: tab?.id });
-    else if (command === 'toggle-recording-pause') {
-      const st = await getSession('recState');
-      if (st?.active) await recorderCommand(st.state === 'paused' ? 'rec:resume' : 'rec:pause');
-    } else if (command === 'stop-recording') await recorderCommand('rec:stop');
-    else if (command === 'toggle-annotation') await recorderCommand('rec:annotate-toggle');
-  } catch { /* nothing to do */ }
+    else if (command === 'capture-visible') await startCapture({ mode: 'visible', tabId: tab?.id });
+    else if (command === 'toggle-recording') {
+      if (st?.active) await recorderCommand('rec:stop');
+      else {
+        // The shortcut counts as invoking the extension on this tab, so tab capture is allowed.
+        // Pages Chrome does not allow (chrome://, Web Store) fall back to screen recording.
+        const source = tab && !restrictionReason(tab.url) ? 'tab' : 'screen';
+        await startRecording({ source, tabId: tab?.id });
+      }
+    } else if (command === 'record-screen') { if (!st?.active) await startRecording({ source: 'screen', tabId: tab?.id }); }
+    else if (command === 'toggle-recording-pause') { if (st?.active) await recorderCommand(st.state === 'paused' ? 'rec:resume' : 'rec:pause'); }
+    else if (command === 'stop-recording') { if (st?.active) await recorderCommand('rec:stop'); }
+    else if (command === 'toggle-annotation') { if (st?.active) await recorderCommand('rec:annotate-toggle'); }
+  } catch (e) {
+    await shortcutError(e?.message || String(e));
+  }
 });
 
 // ---------------------------------------------------------------------------------------------

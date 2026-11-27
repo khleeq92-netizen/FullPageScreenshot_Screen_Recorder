@@ -5,13 +5,25 @@
   "version": "1.0.0",
   "description": "Full-page HD screenshots (JPG/PDF), screen & tab recording with webcam, annotations and a built-in video editor. 100% local.",
   "minimum_chrome_version": "116",
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_title": "FullPage HD Capture",
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
-  "background": { "service_worker": "background.js", "type": "module" },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "permissions": [
     "activeTab",
     "scripting",
@@ -22,12 +34,50 @@
     "tabCapture",
     "desktopCapture"
   ],
-  "optional_host_permissions": ["<all_urls>"],
+  "optional_host_permissions": [
+    "<all_urls>"
+  ],
   "commands": {
-    "capture-full-page": { "suggested_key": { "default": "Alt+Shift+P" }, "description": "Capture the entire page" },
-    "toggle-recording-pause": { "suggested_key": { "default": "Alt+Shift+K" }, "description": "Pause / resume the current recording" },
-    "stop-recording": { "suggested_key": { "default": "Alt+Shift+S" }, "description": "Stop the current recording" },
-    "toggle-annotation": { "description": "Toggle on-screen annotation while recording" }
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "Open FullPage HD Capture"
+    },
+    "capture-full-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Capture the entire page"
+    },
+    "toggle-recording": {
+      "suggested_key": {
+        "default": "Alt+Shift+V",
+        "mac": "Alt+Shift+V"
+      },
+      "description": "Start recording this tab / stop and save the recording"
+    },
+    "toggle-recording-pause": {
+      "suggested_key": {
+        "default": "Alt+Shift+K",
+        "mac": "Alt+Shift+K"
+      },
+      "description": "Pause / resume the current recording"
+    },
+    "capture-visible": {
+      "description": "Capture the visible part of the page"
+    },
+    "record-screen": {
+      "description": "Record the entire screen or a window"
+    },
+    "stop-recording": {
+      "description": "Stop and save the current recording"
+    },
+    "toggle-annotation": {
+      "description": "Draw on the page while recording (toggle)"
+    }
   },
   "web_accessible_resources": [],
   "content_security_policy": {

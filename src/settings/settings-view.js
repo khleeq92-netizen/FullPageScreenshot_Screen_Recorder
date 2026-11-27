@@ -4,6 +4,7 @@ import { getSettings, saveSettings, resetSettings, DEFAULT_SETTINGS } from '../s
 import { clearAll, cleanupTemporary } from '../storage/db.js';
 import { formatBytes } from '../shared/format.js';
 import { expandPattern } from '../shared/filenames.js';
+import { shortcutsPanel } from '../shared/shortcuts.js';
 
 export async function renderSettings({ view, head }) {
   let s = await getSettings();
@@ -74,6 +75,7 @@ export async function renderSettings({ view, head }) {
     row('Subfolder in Downloads', txt('downloadSubfolder'), 'Leave empty to save directly to Downloads.')),
   h('div', { class: 'small muted', style: { marginTop: '8px' } }, 'Tokens: {site} {title} {domain} {date} {time} {datetime} {yyyy} {mm} {dd} {hh} {min} {ss}. Invalid characters are removed and existing files are never overwritten.'),
   h('div', { style: { marginTop: '10px' } }, chk('askWhereToSave', 'Ask where to save each file (choose any folder)'))),
+  group('Keyboard shortcuts', h('div', { class: 'small muted', style: { marginBottom: '8px' } }, 'Chrome lets you change or add keys at chrome://extensions/shortcuts. Shortcuts also work when the popup is closed.'), await shortcutsPanel()),
   group('Appearance', h('div', { class: 'form-grid' }, row('Theme', sel('theme', [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']])))),
   group('Privacy & storage',
     h('div', { class: 'col' },

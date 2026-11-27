@@ -102,7 +102,7 @@ Run single suites with `xvfb-run -a node tests/e2e/run-e2e.mjs screenshot`, or s
 
 Load `dist/` unpacked in a normal Chrome profile.
 
-1. **Toolbar flow, `activeTab`:** on a normal website, click the icon → **CAPTURE FULL PAGE**. Progress shows in the popup and badge, and the preview opens. Repeat with <kbd>Alt+Shift+P</kbd>.
+1. **Toolbar flow, `activeTab`:** on a normal website, click the icon → **CAPTURE FULL PAGE**. Progress shows in the popup and badge, and the preview opens. Repeat with <kbd>Alt+Shift+S</kbd>, and start/stop a tab recording with <kbd>Alt+Shift+V</kbd>.
 2. **Restricted pages:** on `chrome://settings` the popup explains that full‑page capture is impossible there; **RECORD SCREEN** still works.
 3. **Permissions:**
    - Choose *Microphone* and *Webcam* in the popup and press Start. The Screen Recorder page opens and asks for access.

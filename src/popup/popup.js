@@ -4,6 +4,7 @@ import { getSettings, saveSettings } from '../shared/settings.js';
 import { listItems, getBlob } from '../storage/db.js';
 import { restrictionReason } from '../screenshot/capture-controller.js';
 import { formatDuration, formatBytes } from '../shared/format.js';
+import { shortcutsPanel } from '../shared/shortcuts.js';
 
 const main = $('#main');
 let tab = null; let settings = null;
@@ -47,6 +48,14 @@ async function renderHome() {
     act('open-history', 'history', 'Capture History', () => openApp('history')),
     act('open-settings2', 'settings', 'Settings', () => openApp('settings'))));
 
+  const { shortcutError } = await chrome.storage.session.get('shortcutError');
+  if (shortcutError && Date.now() - shortcutError.at < 30000) {
+    main.append(h('div', { class: 'notice error' }, `Shortcut failed: ${shortcutError.message}`));
+    chrome.storage.session.remove('shortcutError'); chrome.action.setBadgeText({ text: '' });
+  }
+  const sc = h('details', { id: 'shortcuts' }, h('summary', { class: 'small', style: { cursor: 'pointer', fontWeight: 600 } }, 'Keyboard shortcuts'));
+  shortcutsPanel({ compact: false }).then((p) => sc.append(p));
+
   const items = (await listItems().catch(() => [])).slice(0, 3);
   if (items.length) {
     const grid = h('div', { class: 'recent' });
@@ -63,6 +72,7 @@ async function renderHome() {
     }
     main.append(h('div', { class: 'col' }, h('div', { class: 'row' }, h('b', { class: 'grow small' }, 'Recent captures'), h('a', { href: '#', class: 'small', onclick: (e) => { e.preventDefault(); openApp('history'); } }, 'View all')), grid));
   }
+  main.append(sc);
 }
 
 function renderCaptureProgress(st) {
@@ -189,7 +199,8 @@ function renderRecording(st) {
   if (st.state !== 'recording' && st.state !== 'paused') controls.querySelectorAll('button:not(#rec-cancel):not(#rec-stop)').forEach((b) => { b.disabled = true; });
   const warn = (st.warnings || []).length ? h('div', { class: 'notice warn small' }, st.warnings.join(' ')) : null;
   main.replaceChildren(h('div', { class: 'card rec-card' }, header, info, meter, controls, warn),
-    h('div', { class: 'muted small' }, 'Shortcuts: ', h('kbd', {}, 'Alt+Shift+K'), ' pause · ', h('kbd', {}, 'Alt+Shift+S'), ' stop'));
+    h('div', { id: 'rec-shortcuts' }));
+  shortcutsPanel({ compact: true }).then((p) => main.querySelector('#rec-shortcuts')?.replaceChildren(p));
 }
 
 async function render() {
